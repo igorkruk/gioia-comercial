@@ -1,0 +1,5 @@
+{
+  "functions": {
+    "api/deals.js": { "runtime": "edge" }
+  }
+}

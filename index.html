@@ -381,7 +381,7 @@ function renderTasksSummary() {
   const tasks = (allData.tasks || []);
 
   const done = tasks.filter(t => t.done && t.done_date && new Date(t.done_date) >= from && new Date(t.done_date) <= to);
-  const pending = tasks.filter(t => !t.done && t.created_at && new Date(t.created_at) >= from && new Date(t.created_at) <= to);
+  const pending = tasks.filter(t => !t.done);
 
   const byType = {};
   done.forEach(t => { byType[t.type] = (byType[t.type] || 0) + 1; });

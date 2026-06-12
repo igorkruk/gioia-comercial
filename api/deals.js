@@ -1,3 +1,5 @@
+export const config = { runtime: 'nodejs' };
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const TOKEN = process.env.RD_TOKEN;
@@ -19,7 +21,7 @@ export default async function handler(req, res) {
       created_at: d.created_at,
       user: d.user?.name || '—',
     }));
-    return Response.json({
+    res.status(200).json({
       open_total: openData.total,
       won_total: wonData.total,
       lost_total: lostData.total,
@@ -27,6 +29,6 @@ export default async function handler(req, res) {
       updated_at: new Date().toISOString(),
     });
   } catch (e) {
-    return Response.json({ error: e.message }, { status: 500 });
+    res.status(500).json({ error: e.message });
   }
 }

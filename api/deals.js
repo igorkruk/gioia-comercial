@@ -7,15 +7,14 @@ export default async function handler(req, res) {
   const BASE = 'https://crm.rdstation.com/api/v1';
 
   try {
-    const [openRes, wonRes, lostRes, tasksRes] = await Promise.all([
+    const [openRes, wonRes, lostRes] = await Promise.all([
       fetch(`${BASE}/deals?token=${TOKEN}&deal_pipeline_id=${PIPELINE_ID}&limit=200`),
       fetch(`${BASE}/deals?token=${TOKEN}&deal_pipeline_id=${PIPELINE_ID}&limit=200&win=true`),
       fetch(`${BASE}/deals?token=${TOKEN}&deal_pipeline_id=${PIPELINE_ID}&limit=200&win=false`),
-      fetch(`${BASE}/tasks?token=${TOKEN}&limit=500`),
     ]);
 
-    const [openData, wonData, lostData, tasksData] = await Promise.all([
-      openRes.json(), wonRes.json(), lostRes.json(), tasksRes.json(),
+    const [openData, wonData, lostData] = await Promise.all([
+      openRes.json(), wonRes.json(), lostRes.json(),
     ]);
 
     const mapDeal = d => ({
@@ -32,7 +31,6 @@ export default async function handler(req, res) {
       loss_reason: d.deal_lost_reason?.name || null,
     });
 
-    // IDs de todos os deals do funil Gioia
     const allDeals = [
       ...(openData.deals || []),
       ...(wonData.deals || []),
@@ -40,21 +38,30 @@ export default async function handler(req, res) {
     ];
     const gioiaDealIds = new Set(allDeals.map(d => d._id));
 
-    // Filtrar tarefas apenas dos deals do funil Gioia
-    const tasks = (tasksData.tasks || [])
-      .filter(t => gioiaDealIds.has(t.deal_id))
-      .map(t => ({
-        id: t._id,
-        subject: t.subject,
-        type: t.type,
-        done: t.done,
-        done_date: t.done_date,
-        created_at: t.created_at,
-        deal_id: t.deal_id,
-        status: t.status,
-      }));
+    // Buscar todas as tarefas paginando
+    let allTasks = [];
+    let page = 1;
+    let hasMore = true;
+    while (hasMore && page <= 10) {
+      const tRes = await fetch(`${BASE}/tasks?token=${TOKEN}&limit=200&page=${page}`);
+      const tData = await tRes.json();
+      const batch = (tData.tasks || []).filter(t => gioiaDealIds.has(t.deal_id));
+      allTasks = allTasks.concat(batch);
+      hasMore = tData.has_more;
+      page++;
+    }
 
-    // Deals em andamento = win === null (nem ganhos nem perdidos)
+    const tasks = allTasks.map(t => ({
+      id: t._id,
+      subject: t.subject,
+      type: t.type,
+      done: t.done,
+      done_date: t.done_date,
+      created_at: t.created_at,
+      deal_id: t.deal_id,
+      status: t.status,
+    }));
+
     const openDeals = (openData.deals || []).filter(d => d.win === null || d.win === undefined);
 
     res.status(200).json({

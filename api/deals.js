@@ -1,7 +1,34 @@
 export const config = { runtime: 'nodejs' };
 
+const ADMIN_USER = process.env.ADMIN_USER;
+const ADMIN_PASS = process.env.ADMIN_PASS;
+const SECRET = process.env.AUTH_SECRET || 'gioia2026';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  const url = req.url || '';
+
+  // Rota de login
+  if (url.includes('/api/auth')) {
+    if (req.method !== 'POST') return res.status(405).end();
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    const { user, pass } = JSON.parse(body || '{}');
+    if (user === ADMIN_USER && pass === ADMIN_PASS) {
+      return res.status(200).json({ token: SECRET });
+    }
+    return res.status(401).json({ error: 'Credenciais inválidas' });
+  }
+
+  // Verificar token em todas as outras rotas
+  const auth = req.headers['authorization'] || '';
+  if (auth !== `Bearer ${SECRET}`) {
+    return res.status(401).json({ error: 'Não autorizado' });
+  }
+
   const TOKEN = process.env.RD_TOKEN;
   const PIPELINE_ID = process.env.RD_PIPELINE_ID;
   const BASE = 'https://crm.rdstation.com/api/v1';
@@ -29,16 +56,12 @@ export default async function handler(req, res) {
       amount_total: d.amount_total || 0,
       interactions: d.interactions || 0,
       loss_reason: d.deal_lost_reason?.name || null,
+      source: d.lead_source || d.source || 'Não informado',
     });
 
-    const allDeals = [
-      ...(openData.deals || []),
-      ...(wonData.deals || []),
-      ...(lostData.deals || []),
-    ];
+    const allDeals = [...(openData.deals||[]), ...(wonData.deals||[]), ...(lostData.deals||[])];
     const gioiaDealIds = new Set(allDeals.map(d => d._id));
 
-    // Buscar todas as tarefas paginando
     let allTasks = [];
     let page = 1;
     let hasMore = true;
